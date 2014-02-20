@@ -47,6 +47,8 @@ from swift.common.swob import HTTPAccepted, HTTPBadRequest, HTTPCreated, \
     HTTPConflict
 from swift.obj.diskfile import DATAFILE_SYSTEM_META, DiskFileManager
 
+from get_as import get_as
+
 
 class ObjectController(object):
     """Implements the WSGI application for the Swift Object Server."""
@@ -73,6 +75,7 @@ class ObjectController(object):
         if replication_server is not None:
             replication_server = config_true_value(replication_server)
         self.replication_server = replication_server
+        self.use_get_extensions = config_true_value(conf.get('use_get_extensions', 'false'))
 
         default_allowed_headers = '''
             content-disposition,
@@ -469,6 +472,9 @@ class ObjectController(object):
             return HTTPInsufficientStorage(drive=device, request=request)
         try:
             with disk_file.open():
+                if self.use_get_extensions and 'as' in request.params:
+                    return get_as(request.params, disk_file._fp)
+
                 metadata = disk_file.get_metadata()
                 obj_size = int(metadata['Content-Length'])
                 if request.headers.get('if-match') not in (None, '*') and \
